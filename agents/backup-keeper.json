@@ -1,0 +1,35 @@
+{
+  "id": "backup-keeper",
+  "name": "Backup Keeper",
+  "description": "Backs up your chosen folders to your own S3 bucket on Glacier Deep Archive (about $1 per TB a month), as they change and nightly. Sets up the account, bucket and upload-only user with your approval.",
+  "publisher": "vaultdbai",
+  "repo": "github.com/vaultdbai/nandi-personal-backup",
+  "latest_version": "0.1.1",
+  "ref": "v0.1.1",
+  "min_nandi_version": "0.1.0",
+  "path": "agents/backup-keeper",
+  "tags": [
+    "official",
+    "free",
+    "personal",
+    "backup",
+    "aws"
+  ],
+  "capabilities": {
+    "tools": [],
+    "network": [],
+    "pilots": [],
+    "requires_approval": [],
+    "connectors": [
+      "s3_backup"
+    ]
+  },
+  "estimated_cost_usd": {
+    "min": 0.01,
+    "max": 0.05
+  },
+  "icon_url": "https://raw.githubusercontent.com/vaultdbai/nandi-personal-backup/HEAD/icon.svg",
+  "readme_url": "https://raw.githubusercontent.com/vaultdbai/nandi-personal-backup/HEAD/agents/backup-keeper/README.md",
+  "commit": "36dfcaffd660d93f8a61e5f4cae652e57c474610",
+  "signature": "ed25519:xItt6hdf2SMoO9WvO2H8x8AdmWKlcPRhpNH4mHUAQuACmSQxJg3ncN5b19ckuotDqIbV3y0j2ufrglA2gvLBBQ=="
+}

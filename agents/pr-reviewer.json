@@ -1,0 +1,38 @@
+{
+  "id": "pr-reviewer",
+  "name": "PR Reviewer",
+  "description": "Reviews a GitHub pull request, private repositories included, against your own rules and the repo's guidelines, then posts the review on the PR once you approve the exact comments.",
+  "publisher": "vaultdbai",
+  "repo": "github.com/vaultdbai/nandi-dev-pack",
+  "latest_version": "0.5.1",
+  "ref": "v0.5.1",
+  "min_nandi_version": "0.1.0",
+  "path": "agents/pr-reviewer",
+  "tags": [
+    "official",
+    "free",
+    "engineering",
+    "code-review",
+    "github"
+  ],
+  "capabilities": {
+    "tools": [
+      "read_file",
+      "list_dir"
+    ],
+    "network": [],
+    "pilots": [],
+    "requires_approval": [],
+    "connectors": [
+      "github"
+    ]
+  },
+  "estimated_cost_usd": {
+    "min": 0.02,
+    "max": 0.4
+  },
+  "icon_url": "https://raw.githubusercontent.com/vaultdbai/nandi-dev-pack/HEAD/icon.svg",
+  "readme_url": "https://raw.githubusercontent.com/vaultdbai/nandi-dev-pack/HEAD/agents/pr-reviewer/README.md",
+  "commit": "b4b17909592052a809a6a4f29911736929a33cd2",
+  "signature": "ed25519:OpV7nr0JpA7DAonGowu0SP7kqijnS6AkAd247WcXMdBadO6bFoMGWH85wfDGtaUBpyn8jPkFuI2dCae9RAyyDw=="
+}

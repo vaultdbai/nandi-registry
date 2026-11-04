@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "agents": [
+    {
+      "id": "pr-reviewer",
+      "name": "PR Reviewer",
+      "description": "Reviews a GitHub pull request, private repositories included, against your own rules and the repo's guidelines, then posts the review on the PR once you approve the exact comments.",
+      "publisher": "vaultdbai",
+      "repo": "github.com/vaultdbai/nandi-dev-pack",
+      "latest_version": "0.5.1",
+      "ref": "v0.5.1",
+      "min_nandi_version": "0.1.0",
+      "path": "agents/pr-reviewer",
+      "tags": [
+        "official",
+        "free",
+        "engineering",
+        "code-review",
+        "github"
+      ],
+      "capabilities": {
+        "tools": [
+          "read_file",
+          "list_dir"
+        ],
+        "network": [],
+        "pilots": [],
+        "requires_approval": [],
+        "connectors": [
+          "github"
+        ]
+      },
+      "estimated_cost_usd": {
+        "min": 0.02,
+        "max": 0.4
+      },
+      "commit": "b4b17909592052a809a6a4f29911736929a33cd2",
+      "signature": "ed25519:OpV7nr0JpA7DAonGowu0SP7kqijnS6AkAd247WcXMdBadO6bFoMGWH85wfDGtaUBpyn8jPkFuI2dCae9RAyyDw=="
+    },
+    {
+      "id": "aws-ops-analyst",
+      "name": "AWS Ops Analyst",
+      "description": "Investigates failed Batch jobs, CloudWatch alarms, ECS services and EC2 instances from logs and metrics, finds the cause with evidence, and proposes a fix that waits for your approval.",
+      "publisher": "vaultdbai",
+      "repo": "github.com/vaultdbai/nandi-dev-pack",
+      "latest_version": "0.5.1",
+      "ref": "v0.5.1",
+      "min_nandi_version": "0.1.0",
+      "path": "agents/aws-ops-analyst",
+      "tags": [
+        "official",
+        "free",
+        "ops",
+        "aws",
+        "incidents"
+      ],
+      "capabilities": {
+        "tools": [
+          "read_file",
+          "list_dir"
+        ],
+        "network": [],
+        "pilots": [],
+        "requires_approval": [],
+        "connectors": [
+          "aws"
+        ]
+      },
+      "estimated_cost_usd": {
+        "min": 0.02,
+        "max": 0.4
+      },
+      "commit": "b4b17909592052a809a6a4f29911736929a33cd2",
+      "signature": "ed25519:/QkzdLbbWz714FQCzVdimtvGo/4yFSknHNNPrtNSuQlMozzNm2UbIbxZZC63ICxrGdbTQD5fst3ySuY8R/e2Bg=="
+    },
+    {
+      "id": "backup-keeper",
+      "name": "Backup Keeper",
+      "description": "Backs up your chosen folders to your own S3 bucket on Glacier Deep Archive (about $1 per TB a month), as they change and nightly. Sets up the account, bucket and upload-only user with your approval.",
+      "publisher": "vaultdbai",
+      "repo": "github.com/vaultdbai/nandi-personal-backup",
+      "latest_version": "0.1.1",
+      "ref": "v0.1.1",
+      "min_nandi_version": "0.1.0",
+      "path": "agents/backup-keeper",
+      "tags": [
+        "official",
+        "free",
+        "personal",
+        "backup",
+        "aws"
+      ],
+      "capabilities": {
+        "tools": [],
+        "network": [],
+        "pilots": [],
+        "requires_approval": [],
+        "connectors": [
+          "s3_backup"
+        ]
+      },
+      "estimated_cost_usd": {
+        "min": 0.01,
+        "max": 0.05
+      },
+      "commit": "36dfcaffd660d93f8a61e5f4cae652e57c474610",
+      "signature": "ed25519:xItt6hdf2SMoO9WvO2H8x8AdmWKlcPRhpNH4mHUAQuACmSQxJg3ncN5b19ckuotDqIbV3y0j2ufrglA2gvLBBQ=="
+    }
+  ],
+  "packs": [
+    {
+      "id": "dev-pack",
+      "name": "Nandi Dev Pack",
+      "description": "Official agents from Nandi. PR Reviewer reviews pull requests; AWS Ops Analyst investigates failed jobs, alarms, services and instances.",
+      "publisher": "vaultdbai",
+      "repo": "github.com/vaultdbai/nandi-dev-pack",
+      "latest_version": "0.5.1",
+      "ref": "v0.5.1",
+      "min_nandi_version": "0.1.0",
+      "tags": [
+        "official",
+        "free",
+        "engineering",
+        "productivity",
+        "github"
+      ],
+      "agents": [
+        {
+          "id": "pr-reviewer",
+          "name": "PR Reviewer",
+          "description": "Reviews a GitHub pull request, private repositories included, against your own rules and the repo's guidelines, then posts the review on the PR once you approve the exact comments."
+        },
+        {
+          "id": "aws-ops-analyst",
+          "name": "AWS Ops Analyst",
+          "description": "Investigates failed Batch jobs, CloudWatch alarms, ECS services and EC2 instances from logs and metrics, finds the cause with evidence, and proposes a fix that waits for your approval."
+        }
+      ],
+      "workflows": [],
+      "capabilities": {
+        "tools": [
+          "read_file",
+          "list_dir"
+        ],
+        "network": [],
+        "pilots": [],
+        "requires_approval": [],
+        "connectors": [
+          "github",
+          "aws"
+        ]
+      },
+      "install_size_kb": 25,
+      "estimated_cost_usd": {
+        "min": 0.02,
+        "max": 0.4
+      },
+      "icon_url": "https://raw.githubusercontent.com/vaultdbai/nandi-dev-pack/HEAD/icon.svg",
+      "readme_url": "https://raw.githubusercontent.com/vaultdbai/nandi-dev-pack/HEAD/README.md",
+      "commit": "b4b17909592052a809a6a4f29911736929a33cd2",
+      "signature": "ed25519:pJQLEsskNSjPq0xfotWrdrjA7nVDRC6vjZuydxt1qVGMK4bo10RL7bmOzoLUjl38wvONorVf6Mx/AUnXdxnyCg=="
+    },
+    {
+      "id": "personal-backup",
+      "name": "Nandi Personal Backup",
+      "description": "Backs up the folders you choose to your own Amazon S3 bucket on Glacier Deep Archive, as they change and every night. Backup Keeper sets up the AWS side with you.",
+      "publisher": "vaultdbai",
+      "repo": "github.com/vaultdbai/nandi-personal-backup",
+      "latest_version": "0.1.1",
+      "ref": "v0.1.1",
+      "min_nandi_version": "0.1.0",
+      "tags": [
+        "official",
+        "free",
+        "personal",
+        "backup",
+        "aws"
+      ],
+      "agents": [
+        {
+          "id": "backup-keeper",
+          "name": "Backup Keeper",
+          "description": "Backs up your chosen folders to your own S3 bucket on Glacier Deep Archive (about $1 per TB a month), as they change and nightly. Sets up the account, bucket and upload-only user with your approval."
+        }
+      ],
+      "workflows": [
+        "set-up-s3-backup"
+      ],
+      "capabilities": {
+        "tools": [],
+        "network": [],
+        "pilots": [],
+        "requires_approval": [],
+        "connectors": [
+          "s3_backup"
+        ]
+      },
+      "install_size_kb": 12,
+      "estimated_cost_usd": {
+        "min": 0.01,
+        "max": 0.1
+      },
+      "icon_url": "https://raw.githubusercontent.com/vaultdbai/nandi-personal-backup/HEAD/icon.svg",
+      "readme_url": "https://raw.githubusercontent.com/vaultdbai/nandi-personal-backup/HEAD/README.md",
+      "commit": "36dfcaffd660d93f8a61e5f4cae652e57c474610",
+      "signature": "ed25519:LXTZHlQmpOplvhdYbNGOzNXcBrVR2N9nc7Jz4qyXKH9NmKD/TvvcwOOs4CrFfZpb2o2xwWMzv19Gtc4HjNoqAA=="
+    }
+  ]
+}
