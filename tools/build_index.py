@@ -822,6 +822,7 @@ def build(packs: list[dict], connectors: list[dict]) -> dict[Path, dict]:
             ],
             "workflows": pack["workflows"],
             "capabilities": caps(pack["agents"]),
+            **({"requires_connectors": list(m["requires_connectors"])} if m.get("requires_connectors") else {}),
             "install_size_kb": pack["size_kb"],
             "estimated_cost_usd": old.get("estimated_cost_usd", {"min": lo, "max": hi}),
             "icon_url": raw("icon.svg"),
