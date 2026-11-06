@@ -205,5 +205,6 @@
       "commit": "36dfcaffd660d93f8a61e5f4cae652e57c474610",
       "signature": "ed25519:LXTZHlQmpOplvhdYbNGOzNXcBrVR2N9nc7Jz4qyXKH9NmKD/TvvcwOOs4CrFfZpb2o2xwWMzv19Gtc4HjNoqAA=="
     }
-  ]
+  ],
+  "connectors": []
 }

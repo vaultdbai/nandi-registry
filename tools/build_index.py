@@ -14,8 +14,16 @@ Curated by hand in registry/agents/<id>.json and registry/packs/<id>.json (kept)
     tags, estimated_cost_usd, publisher, signature, and any other extra keys.
     SEED below is used only when an entry file doesn't exist yet.
 
+Written by the publisher in connectors/<id>.json (never rewritten here): every
+field. They are validated and listed in index.json under "connectors". A
+connector with `placement: host` fails: the public registry lists container
+connectors only.
+
 Stdlib only, except PyYAML when it's installed (a minimal frontmatter parser is
-the fallback). --check compares parsed JSON, so Prettier formatting is fine.
+the fallback) and jsonschema, which also checks connector entries against
+../nandi-spec/registry-schema/connector.schema.json when both are there.
+--check compares parsed JSON, so Prettier formatting is fine. Each file keeps
+the line ending it has; new files get LF.
 """
 
 from __future__ import annotations
@@ -25,6 +33,7 @@ import math
 import re
 import sys
 from pathlib import Path
+from typing import Sequence
 
 try:
     import yaml  # type: ignore
@@ -438,6 +447,290 @@ def load_pack(folder: Path) -> dict | None:
     }
 
 
+# -- Connectors ----------------------------------------------------------------
+# Mirrors registry-schema/connector.schema.json in vaultdbai/nandi-spec. Keep
+# the two in step.
+
+CONNECTOR_REQUIRED = (
+    "id", "name", "description", "publisher", "repo", "path", "latest_version",
+    "min_nandi_version", "tags", "kind", "run", "placement", "auth", "tools", "data", "hosts",
+)
+CONNECTOR_OPTIONAL = ("ref", "commit", "signature", "image")
+CONNECTOR_RESERVED = ("icon_url", "readme_url", "install_count", "rating", "verified", "deprecated", "license")
+CONNECTOR_KINDS = ("mcp-stdio", "mcp-http", "builtin")
+RUN_KEYS = {
+    "mcp-stdio": ({"command", "package", "version"}, {"args"}),
+    "mcp-http": ({"url"}, set()),
+    "builtin": ({"builtin"}, set()),
+}
+AUTH_KEYS = {"type", "env", "scopes", "label"}
+AUTH_TYPES = ("none", "api_key", "oauth", "device_code")
+PUBLISHER_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
+SEMVER_RE = re.compile(
+    r"^(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:[+][0-9A-Za-z.-]+)?$"
+)
+PACKAGE_RE = re.compile(r"^(?:@[a-z0-9][a-z0-9._-]*/)?[A-Za-z0-9][A-Za-z0-9._-]*$")
+EXACT_VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+){1,3}(?:[-.+]?[0-9A-Za-z.]+)?$")
+RANGE_RE = re.compile(r"[\^~<>=*|\s]")
+BUILTIN_RE = re.compile(r"^[a-z0-9_-]+$")
+ENV_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
+TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+HOST_RE = re.compile(
+    r"^(?:\*\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+(?::[0-9]{1,5})?$"
+)
+COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+SIGNATURE_RE = re.compile(r"^ed25519:[A-Za-z0-9+/=]+$")
+HOST_PLACEMENT = (
+    "runs on the host: the public registry lists container connectors only; "
+    "add host connectors by hand or from a company registry"
+)
+
+
+def _text(value, max_len: int | None = None) -> bool:
+    return isinstance(value, str) and len(value) >= 1 and (max_len is None or len(value) <= max_len)
+
+
+def _texts(value) -> bool:
+    return isinstance(value, list) and all(_text(x) for x in value)
+
+
+def _matches(pattern: re.Pattern, value) -> bool:
+    return isinstance(value, str) and pattern.match(value) is not None
+
+
+def _relative_path(value) -> bool:
+    if not _text(value) or "\\" in value or value.startswith("/") or re.match(r"^[A-Za-z]:", value):
+        return False
+    return ".." not in value.split("/")
+
+
+def exact_version_problem(version) -> str | None:
+    """Why a run.version isn't one exact release, or None when it is."""
+    if not _text(version):
+        return "is required"
+    if version.lower() == "latest":
+        return "must be an exact version, not 'latest'"
+    if RANGE_RE.search(version) or any(part in ("x", "X") for part in version.split(".")):
+        return f"'{version}' is a range: pin one exact version"
+    if not EXACT_VERSION_RE.match(version):
+        return f"'{version}' is not an exact version (a tag?)"
+    return None
+
+
+def check_run(where: str, kind, run) -> None:
+    if not isinstance(run, dict):
+        err(f"{where}: run must be an object")
+        return
+    if kind not in RUN_KEYS:
+        return  # the bad kind is reported already
+    required, optional = RUN_KEYS[kind]
+    if not required <= set(run) or set(run) - required - optional:
+        extra = f", plus optional {sorted(optional)}" if optional else ""
+        err(f"{where}: a {kind} run has exactly {sorted(required)}{extra}")
+    if kind == "mcp-stdio":
+        if "command" in run and run["command"] not in ("npx", "uvx"):
+            err(f"{where}: run.command must be npx or uvx")
+        if "package" in run and not _matches(PACKAGE_RE, run["package"]):
+            err(f"{where}: run.package '{run['package']}' is not a package name")
+        problem = exact_version_problem(run.get("version"))
+        if problem:
+            err(f"{where}: run.version {problem}")
+        if "args" in run and not (isinstance(run["args"], list) and all(isinstance(a, str) for a in run["args"])):
+            err(f"{where}: run.args must be a list of strings")
+    elif kind == "mcp-http":
+        if not (isinstance(run.get("url"), str) and run["url"].startswith("https://")):
+            err(f"{where}: run.url must be https://")
+    elif "builtin" in run and not _matches(BUILTIN_RE, run["builtin"]):
+        err(f"{where}: run.builtin '{run['builtin']}' is not a builtin name")
+
+
+def check_auth(where: str, auth) -> None:
+    if not isinstance(auth, dict):
+        err(f"{where}: auth must be an object")
+        return
+    if set(auth) - AUTH_KEYS:
+        err(f"{where}: auth has unknown keys {sorted(set(auth) - AUTH_KEYS)}")
+    if auth.get("type") not in AUTH_TYPES:
+        err(f"{where}: auth.type must be one of {', '.join(AUTH_TYPES)}")
+    env = auth.get("env", [])
+    if not (isinstance(env, list) and all(_matches(ENV_RE, e) for e in env)):
+        err(f"{where}: auth.env must list environment variable names like LINEAR_API_KEY")
+    if "scopes" in auth and not _texts(auth["scopes"]):
+        err(f"{where}: auth.scopes must be a list of non-empty strings")
+    if "label" in auth and not isinstance(auth["label"], str):
+        err(f"{where}: auth.label must be a string")
+
+
+def check_tools(where: str, tools) -> None:
+    if not isinstance(tools, list):
+        err(f"{where}: tools must be a list")
+        return
+    names: set[str] = set()
+    for i, tool in enumerate(tools):
+        tw = f"{where} tool {i + 1}"
+        if not isinstance(tool, dict) or set(tool) != {"name", "description", "access"}:
+            err(f"{tw}: a tool is exactly {{name, description, access}}")
+            continue
+        name = tool["name"]
+        if not _matches(TOOL_NAME_RE, name):
+            err(f"{tw}: invalid tool name '{name}'")
+        elif name in names:
+            err(f"{tw}: tool name '{name}' is listed twice")
+        else:
+            names.add(name)
+        if not _text(tool["description"], 200):
+            err(f"{tw}: description must be 1-200 chars")
+        if tool["access"] not in ("read", "write"):
+            err(f"{tw}: access must be read or write")
+
+
+def check_reserved(where: str, entry: dict) -> None:
+    for key in ("icon_url", "readme_url"):
+        if key in entry and not (isinstance(entry[key], str) and entry[key].startswith("https://")):
+            err(f"{where}: {key} must be https://")
+    count = entry.get("install_count", 0)
+    if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+        err(f"{where}: install_count must be a whole number, 0 or more")
+    rating = entry.get("rating", 0)
+    if not isinstance(rating, (int, float)) or isinstance(rating, bool) or not 0 <= rating <= 5:
+        err(f"{where}: rating must be a number from 0 to 5")
+    for key in ("verified", "deprecated"):
+        if key in entry and not isinstance(entry[key], bool):
+            err(f"{where}: {key} must be true/false")
+    if "license" in entry and not isinstance(entry["license"], str):
+        err(f"{where}: license must be a string")
+
+
+def check_connector(path: Path, entry) -> None:
+    """Stdlib checks of one connectors/<id>.json, mirroring the schema."""
+    where = f"connectors/{path.name}"
+    if not isinstance(entry, dict):
+        err(f"{where}: not a JSON object")
+        return
+    missing = [k for k in CONNECTOR_REQUIRED if k not in entry]
+    if missing:
+        err(f"{where}: missing {', '.join(missing)}")
+    unknown = set(entry) - set(CONNECTOR_REQUIRED) - set(CONNECTOR_OPTIONAL) - set(CONNECTOR_RESERVED)
+    if unknown:
+        err(f"{where}: unknown keys {sorted(unknown)}")
+
+    cid = entry.get("id")
+    if not _matches(ID_RE, cid):
+        err(f"{where}: invalid connector ID '{cid}'")
+    elif cid != path.stem:
+        err(f"{where}: id '{cid}' must equal the file name")
+    if "name" in entry and not _text(entry["name"]):
+        err(f"{where}: name is required")
+    if "description" in entry and not _text(entry["description"], 200):
+        err(f"{where}: description must be 1-200 chars")
+    if "publisher" in entry:
+        publisher = entry["publisher"]
+        if not _matches(PUBLISHER_RE, publisher):
+            err(f"{where}: publisher '{publisher}' is not a GitHub handle")
+        elif not (REGISTRY / "publishers" / f"{publisher}.json").is_file():
+            err(f"{where}: publishers/{publisher}.json missing")
+    if "repo" in entry and not _text(entry["repo"]):
+        err(f"{where}: repo is required")
+    if "path" in entry and not _relative_path(entry["path"]):
+        err(f"{where}: path must be relative, with no '..'")
+    for key in ("latest_version", "min_nandi_version"):
+        if key in entry and not _matches(SEMVER_RE, entry[key]):
+            err(f"{where}: {key} '{entry[key]}' is not a semver version")
+    if "ref" in entry and not _text(entry["ref"]):
+        err(f"{where}: ref must be a tag name")
+    if "commit" in entry and not _matches(COMMIT_RE, entry["commit"]):
+        err(f"{where}: commit must be the full 40-character SHA")
+    if "signature" in entry and not _matches(SIGNATURE_RE, entry["signature"]):
+        err(f"{where}: signature must be 'ed25519:<base64>'")
+    if "tags" in entry and not (_texts(entry["tags"]) and entry["tags"]):
+        err(f"{where}: tags must be a non-empty list of non-empty strings")
+
+    kind = entry.get("kind")
+    if "kind" in entry and kind not in CONNECTOR_KINDS:
+        err(f"{where}: kind must be one of {', '.join(CONNECTOR_KINDS)}")
+    if "run" in entry:
+        check_run(where, kind, entry["run"])
+    if "image" in entry:
+        if kind == "mcp-http":
+            err(f"{where}: an mcp-http connector has no image (it runs at its URL)")
+        elif not _text(entry["image"]):
+            err(f"{where}: image must be a non-empty string")
+    placement = entry.get("placement")
+    if placement == "host":
+        err(f"{where}: {HOST_PLACEMENT}")
+    elif "placement" in entry and placement != "container":
+        err(f"{where}: placement must be container")
+    if "auth" in entry:
+        check_auth(where, entry["auth"])
+    if "tools" in entry:
+        check_tools(where, entry["tools"])
+    data = entry.get("data")
+    if "data" in entry and not (
+        isinstance(data, dict) and set(data) == {"read", "write"} and _texts(data["read"]) and _texts(data["write"])
+    ):
+        err(f"{where}: data must be {{read: [...], write: [...]}}, in plain words")
+    hosts = entry.get("hosts")
+    if "hosts" in entry:
+        if not isinstance(hosts, list):
+            err(f"{where}: hosts must be a list")
+        else:
+            for h in hosts:
+                if not _matches(HOST_RE, h):
+                    err(f"{where}: host '{h}' is not a lowercase host name (optionally *. and :port)")
+    check_reserved(where, entry)
+
+
+def schema_validator(schema_path: Path):
+    """A jsonschema validator for connector entries, or None when jsonschema
+    or the nandi-spec checkout isn't there. The stdlib checks run either way."""
+    if not schema_path.is_file():
+        return None
+    try:
+        import jsonschema  # type: ignore
+    except ImportError:
+        return None
+    schemas = {}
+    for f in schema_path.parent.glob("*.schema.json"):
+        doc = json.loads(f.read_text(encoding="utf-8"))
+        schemas[doc.get("$id", f.name)] = doc
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    cls = jsonschema.validators.validator_for(schema)
+    try:
+        from referencing import Registry, Resource  # type: ignore
+    except ImportError:  # jsonschema before 4.18
+        return cls(schema, resolver=jsonschema.RefResolver.from_schema(schema, store=schemas))
+    registry = Registry().with_resources((uri, Resource.from_contents(doc)) for uri, doc in schemas.items())
+    return cls(schema, registry=registry)
+
+
+def load_connectors(schema_path: Path) -> list[dict]:
+    """Every connectors/<id>.json, validated and sorted by ID. They are the
+    publisher's files: nothing here rewrites them."""
+    folder = REGISTRY / "connectors"
+    paths = sorted(folder.glob("*.json")) if folder.is_dir() else []
+    validator = schema_validator(schema_path) if paths else None
+    if paths and validator is None:
+        print("note: connector schema or jsonschema missing, running the built-in checks only")
+    connectors: dict[str, dict] = {}
+    for path in paths:
+        entry = read_json(path)
+        if entry is None:
+            continue
+        check_connector(path, entry)
+        if validator is not None:
+            for e in sorted(validator.iter_errors(entry), key=lambda e: list(map(str, e.absolute_path))):
+                loc = "/".join(str(p) for p in e.absolute_path) or "(entry)"
+                err(f"connectors/{path.name}: schema: {loc}: {e.message}")
+        cid = entry.get("id") if isinstance(entry, dict) else None
+        if not isinstance(cid, str):
+            continue
+        if cid in connectors:
+            err(f"connector ID '{cid}' is used by two entries")
+            continue
+        connectors[cid] = entry
+    return [connectors[c] for c in sorted(connectors)]
+
+
 # -- Registry ------------------------------------------------------------------
 
 
@@ -467,7 +760,16 @@ def caps(agents: list[dict]) -> dict:
     }
 
 
-def build(packs: list[dict]) -> dict[Path, dict]:
+def write_json(path: Path, data: dict) -> None:
+    """Write with the line ending the file already has (LF for a new file)."""
+    newline = "\r\n" if path.is_file() and b"\r\n" in path.read_bytes() else "\n"
+    text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as f:
+        f.write(text.replace("\n", newline))
+
+
+def build(packs: list[dict], connectors: list[dict]) -> dict[Path, dict]:
     files: dict[Path, dict] = {}
     index_agents, index_packs = [], []
     for pack in packs:
@@ -533,6 +835,7 @@ def build(packs: list[dict]) -> dict[Path, dict]:
         "schema_version": SCHEMA_VERSION,
         "agents": index_agents,
         "packs": index_packs,
+        "connectors": [{k: v for k, v in c.items() if k not in ("icon_url", "readme_url")} for c in connectors],
     }
     pub = REGISTRY / "publishers" / f"{PUBLISHER}.json"
     files[pub] = read_json(pub) or {
@@ -543,8 +846,17 @@ def build(packs: list[dict]) -> dict[Path, dict]:
     return files
 
 
-def main() -> int:
-    check = "--check" in sys.argv[1:]
+def main(argv: Sequence[str] | None = None, root: Path | None = None) -> int:
+    """Validate and rebuild. `root` is the registry repo (or a workspace that
+    holds registry/), so the tests can run on a copy."""
+    global REGISTRY, PACKS_ROOT
+    argv = sys.argv[1:] if argv is None else list(argv)
+    root = ROOT if root is None else Path(root)
+    REGISTRY = root / "registry" if (root / "registry").is_dir() else root
+    PACKS_ROOT = root if REGISTRY != root else root.parent
+    errors.clear()
+    check = "--check" in argv
+    connectors = load_connectors(PACKS_ROOT / "nandi-spec" / "registry-schema" / "connector.schema.json")
     pack_dirs = sorted(p for p in PACKS_ROOT.iterdir() if (p / ".nandi" / "manifest.yaml").is_file())
     packs = [p for p in (load_pack(d) for d in pack_dirs) if p]
     # Prioritize new high-impact packs at top
@@ -570,15 +882,14 @@ def main() -> int:
                     err(f"{kind} ID '{i}' is used by both {seen[key]} and {pack['id']}")
                 seen[key] = pack["id"]
 
-    files = build(packs)
+    files = build(packs, connectors)
     stale = []
     for path, data in files.items():
         current = read_json(path)
         if current != data:
             stale.append(path)
             if not check:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+                write_json(path, data)
     known = set(files)
     for sub in ("agents", "packs"):
         for p in (REGISTRY / sub).glob("*.json") if (REGISTRY / sub).is_dir() else []:
@@ -586,7 +897,8 @@ def main() -> int:
                 err(f"registry/{sub}/{p.name} has no matching pack content")
 
     n_agents = sum(len(p["agents"]) for p in packs)
-    print(f"packs: {len(packs)}, agents: {n_agents}, workflows: {sum(len(p['workflows']) for p in packs)}")
+    n_workflows = sum(len(p["workflows"]) for p in packs)
+    print(f"packs: {len(packs)}, agents: {n_agents}, workflows: {n_workflows}, connectors: {len(connectors)}")
     for p in packs:
         words = ", ".join(f"{a['id']} {a['words']}w" for a in p["agents"])
         print(f"  {p['id']}: {p['size_kb']} KB; {words}")
