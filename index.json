@@ -105,6 +105,52 @@
       },
       "commit": "36dfcaffd660d93f8a61e5f4cae652e57c474610",
       "signature": "ed25519:xItt6hdf2SMoO9WvO2H8x8AdmWKlcPRhpNH4mHUAQuACmSQxJg3ncN5b19ckuotDqIbV3y0j2ufrglA2gvLBBQ=="
+    },
+    {
+      "id": "social-manager",
+      "name": "Social Manager",
+      "description": "Plans your social media campaigns, writes posts in your voice and fills in LinkedIn and X in a browser you watch. You review each post and press Post yourself.",
+      "publisher": "vaultdbai",
+      "repo": "github.com/vaultdbai/nandi-social-pack",
+      "latest_version": "0.1.0",
+      "ref": "v0.1.0",
+      "min_nandi_version": "0.1.0",
+      "path": "agents/social-manager",
+      "tags": [
+        "official",
+        "free",
+        "marketing",
+        "social",
+        "linkedin",
+        "x"
+      ],
+      "capabilities": {
+        "tools": [],
+        "network": [
+          "linkedin.com",
+          "*.linkedin.com",
+          "*.licdn.com",
+          "x.com",
+          "*.x.com",
+          "twitter.com",
+          "*.twitter.com",
+          "*.twimg.com"
+        ],
+        "pilots": [
+          "browser"
+        ],
+        "requires_approval": [],
+        "connectors": [
+          "web_search",
+          "filesystem"
+        ]
+      },
+      "estimated_cost_usd": {
+        "min": 0.02,
+        "max": 0.3
+      },
+      "commit": "c46443c39cdec4266dcad6a7980a82505ff7af40",
+      "signature": "ed25519:zvy8hj3HohyqXSX6T3fEAbedUrwCmcXXYhhbnA9LAvnaadkqMKNEKqIS+OgVal/RC1tC6HwMY2+tsko/HXneDA=="
     }
   ],
   "packs": [
@@ -204,6 +250,68 @@
       "readme_url": "https://raw.githubusercontent.com/vaultdbai/nandi-personal-backup/HEAD/README.md",
       "commit": "36dfcaffd660d93f8a61e5f4cae652e57c474610",
       "signature": "ed25519:LXTZHlQmpOplvhdYbNGOzNXcBrVR2N9nc7Jz4qyXKH9NmKD/TvvcwOOs4CrFfZpb2o2xwWMzv19Gtc4HjNoqAA=="
+    },
+    {
+      "id": "social-pack",
+      "name": "Nandi Social",
+      "description": "Social Manager plans your campaigns, writes posts in your voice and fills in LinkedIn and X in a browser you watch. You review and press Post yourself.",
+      "publisher": "vaultdbai",
+      "repo": "github.com/vaultdbai/nandi-social-pack",
+      "latest_version": "0.1.0",
+      "ref": "v0.1.0",
+      "min_nandi_version": "0.1.0",
+      "tags": [
+        "official",
+        "free",
+        "marketing",
+        "social",
+        "linkedin",
+        "x"
+      ],
+      "agents": [
+        {
+          "id": "social-manager",
+          "name": "Social Manager",
+          "description": "Plans your social media campaigns, writes posts in your voice and fills in LinkedIn and X in a browser you watch. You review each post and press Post yourself."
+        }
+      ],
+      "workflows": [
+        "draft-week",
+        "plan-campaign",
+        "post-now",
+        "social-research",
+        "weekly-report"
+      ],
+      "capabilities": {
+        "tools": [],
+        "network": [
+          "linkedin.com",
+          "*.linkedin.com",
+          "*.licdn.com",
+          "x.com",
+          "*.x.com",
+          "twitter.com",
+          "*.twitter.com",
+          "*.twimg.com"
+        ],
+        "pilots": [
+          "browser"
+        ],
+        "requires_approval": [],
+        "connectors": [
+          "web_search",
+          "filesystem"
+        ]
+      },
+      "install_size_kb": 24,
+      "estimated_cost_usd": {
+        "min": 0.02,
+        "max": 0.4
+      },
+      "icon_url": "https://raw.githubusercontent.com/vaultdbai/nandi-social-pack/HEAD/icon.svg",
+      "readme_url": "https://raw.githubusercontent.com/vaultdbai/nandi-social-pack/HEAD/README.md",
+      "commit": "c46443c39cdec4266dcad6a7980a82505ff7af40",
+      "signature": "ed25519:/4sxD8gPNq209pdgXqVt7ZM1M6KLTWv4nDpNO56PQQnTKxg6j9EbhhN0DaX+Z6Q3d+kz9BPSCDgfAtKvF3/PCA=="
     }
   ],
   "connectors": []
