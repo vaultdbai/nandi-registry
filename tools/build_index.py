@@ -45,6 +45,7 @@ RAW = "https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{path}"
 PACK_REPOS = {
     "dev-pack": "nandi-dev-pack",
     "personal-backup": "nandi-personal-backup",
+    "social-pack": "nandi-social-pack",
     "finance-pack": "nandi-finance-pack",
     "trading-pack": "nandi-trading-pack",
     "healthcare-pack": "nandi-healthcare-pack",
@@ -60,6 +61,9 @@ PACK_REPOS = {
     "personal-pack": "nandi-personal-pack",
 }
 
+# Pilots a pack agent may name, and what it may let run without asking
+KNOWN_PILOTS = {"browser", "browser-headless"}
+PILOT_ALLOWS = {"interact", "submit", "secrets", "upload", "pay"}
 # Runtime tools plus the host-side built-ins an agent can be granted
 KNOWN_TOOLS = {"shell", "read_file", "write_file", "list_dir", "delegate_to_agent", "find_people", "my_requests"}
 ID_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
@@ -87,6 +91,7 @@ SEED = {
         "aws-ops-analyst": (["official", "ops", "aws", "incidents"], 0.02, 0.40),
         "pr-reviewer": (["official", "engineering", "code-review", "github"], 0.02, 0.40),
         "backup-keeper": (["official", "free", "personal", "backup", "aws"], 0.01, 0.05),
+        "social-manager": (["official", "free", "marketing", "social", "linkedin", "x"], 0.02, 0.30),
         "invoice-reconciler": (["finance", "invoices", "reconciliation", "accounting"], 0.01, 0.15),
         "cashflow-forecaster": (["finance", "cashflow", "runway", "treasury"], 0.02, 0.20),
         "financial-auditor": (["finance", "audit", "statements", "sec", "ratios"], 0.02, 0.25),
@@ -133,6 +138,7 @@ SEED = {
     "packs": {
         "dev-pack": (["official", "engineering", "productivity", "github", "aws"], 0.02, 0.40),
         "personal-backup": (["official", "free", "personal", "backup", "aws"], 0.01, 0.10),
+        "social-pack": (["official", "free", "marketing", "social", "linkedin", "x"], 0.02, 0.40),
         "finance-pack": (["finance", "accounting", "invoices", "cashflow", "smb", "corporate"], 0.05, 0.50),
         "trading-pack": (["trading", "markets", "stocks", "quant", "sentiment", "portfolio"], 0.05, 0.50),
         "healthcare-pack": (["healthcare", "clinical", "medical", "billing", "hipaa"], 0.05, 0.50),
@@ -249,12 +255,12 @@ def load_agent(pack: str, folder: Path) -> dict | None:
         err(f"{where}: name is required")
     if not isinstance(desc, str) or not desc or len(desc) > 200:
         err(f"{where}: description must be 1-200 chars (is {len(desc)})")
-    for banned in ("model", "aws", "pilots"):
+    for banned in ("model", "aws"):
         if banned in fm:
             err(f"{where}: '{banned}' must not be set")
     unknown = set(fm) - {
         "name", "description", "allowed-tools", "requires_approval", "network", "connectors", "tags",
-        "serves", "accepts_delegation",
+        "serves", "accepts_delegation", "pilots",
     }
     if unknown:
         err(f"{where}: unexpected frontmatter keys {sorted(unknown)}")
@@ -292,6 +298,21 @@ def load_agent(pack: str, folder: Path) -> dict | None:
         if cid not in connectors:
             connectors.append(cid)
 
+    # Pilots by ID (`[browser]` or `[{id: browser, allow: [interact]}]`)
+    pilots = []
+    for item in fm.get("pilots") or []:
+        pid = item.get("id") if isinstance(item, dict) else item
+        if pid not in KNOWN_PILOTS:
+            err(f"{where}: unknown pilot '{pid}' (one of {sorted(KNOWN_PILOTS)})")
+            continue
+        allow = item.get("allow") or [] if isinstance(item, dict) else []
+        if set(allow) - PILOT_ALLOWS:
+            err(f"{where}: pilot {pid} allows {sorted(set(allow) - PILOT_ALLOWS)}")
+        if {"submit", "pay"} & set(allow):
+            err(f"{where}: pilot {pid} must not allow submit or pay without asking")
+        if pid not in pilots:
+            pilots.append(pid)
+
     words = len(re.findall(r"\S+", body))
     if not 300 <= words <= 900:
         err(f"{where}: system prompt is {words} words (want 300-900)")
@@ -304,6 +325,7 @@ def load_agent(pack: str, folder: Path) -> dict | None:
         "network": hosts,
         "requires_approval": list(approvals),
         "connectors": connectors,
+        "pilots": pilots,
         "words": words,
     }
 
@@ -421,6 +443,19 @@ def load_pack(folder: Path) -> dict | None:
     if sorted(declared) != sorted(p.name for p in agent_folders):
         err(f"{pack_id}: manifest agents {declared} don't match agents/ folders")
 
+    # Policies a pack ships apply only to its own agents (the app refuses others)
+    for path in sorted((folder / "policies").glob("*.md")) if (folder / "policies").is_dir() else []:
+        where = f"{pack_id}/policies/{path.name}"
+        parts = split_frontmatter(path.read_text(encoding="utf-8"), where)
+        front = parse_yaml(parts[0], where) if parts and yaml else None
+        if yaml and not isinstance(front, dict):
+            err(f"{where}: frontmatter is not a mapping")
+            continue
+        targets = (front or {}).get("applies_to") or []
+        own = {f"agent:{p.name}" for p in agent_folders}
+        if yaml and (not targets or set(targets) - own):
+            err(f"{where}: applies_to must name only this pack's agents ({sorted(own)})")
+
     wf_files = sorted((folder / "workflows").glob("*.yaml"))
     workflows = [w for w in (load_workflow(pack_id, p, set(agents)) for p in wf_files) if w]
     for p in agent_folders:  # optional agent-scoped workflows
@@ -461,7 +496,7 @@ def caps(agents: list[dict]) -> dict:
     return {
         "tools": union("tools"),
         "network": union("network"),
-        "pilots": [],
+        "pilots": union("pilots"),
         "requires_approval": union("requires_approval"),
         "connectors": union("connectors"),
     }

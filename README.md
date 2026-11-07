@@ -46,12 +46,12 @@ The same identity fields (without `path`), plus `agents` (`id`, `name`, `descrip
 - IDs: lowercase letters, digits and hyphens, at most 64 characters. Agent and workflow IDs must be unique across the whole registry, because a user can install everything at once.
 - `path` is relative inside the repo, with no `..`. `ref` is a tag or branch (normally `v<latest_version>`).
 - `icon_url` and `readme_url` must be `https://` (or relative).
-- `capabilities` must match the agent's `skill.md` exactly: `tools` = `allowed-tools`, `network` = the `network.allow` hosts, `requires_approval` = `requires_approval`. Nandi shows these to the user before install and enforces the `skill.md` values at run time. An entry that understates them is rejected in review.
+- `capabilities` must match the agent's `skill.md` exactly: `tools` = `allowed-tools`, `network` = the `network.allow` hosts, `pilots` = the `pilots` IDs, `requires_approval` = `requires_approval`. Nandi shows these to the user before install and enforces the `skill.md` values at run time. An entry that understates them is rejected in review.
 - Bad entries are skipped by the app with a log line; the rest of the index still loads.
 
 ## Submitting an agent or pack
 
-1. **Publish your source repo.** It must be public and contain, for a single agent, a folder with `skill.md` (plus optional `instructions.md`, `README.md`, `workflows/*.yaml`); for a pack, `.nandi/manifest.yaml`, `agents/<id>/…` and `workflows/*.yaml`. Add a `LICENSE`. Tag the release: `git tag -a v1.0.0 -m v1.0.0 && git push --tags`.
+1. **Publish your source repo.** It must be public and contain, for a single agent, a folder with `skill.md` (plus optional `instructions.md`, `README.md`, `workflows/*.yaml`); for a pack, `.nandi/manifest.yaml`, `agents/<id>/…`, `workflows/*.yaml` and optional `policies/<id>.md` (policies that apply only to the pack's own agents, `applies_to: [agent:<id>]`). Add a `LICENSE`. Tag the release: `git tag -a v1.0.0 -m v1.0.0 && git push --tags`.
 2. **Fork this repository** and add:
    - `agents/<id>.json` for each agent, and/or `packs/<id>.json`
    - the same entries in `index.json` (in the `agents` / `packs` arrays)
@@ -61,6 +61,7 @@ The same identity fields (without `path`), plus `agents` (`id`, `name`, `descrip
    - the system prompt is genuinely useful and doesn't ask for capabilities it doesn't use
    - network hosts are specific (no `*`) and justified in the agent's README
    - every tool that can write files or run commands requires approval, unless there's a good reason it doesn't
+   - a browser pilot allows at most `interact` without asking (never `submit` or `pay`)
    - IDs don't collide with existing entries
 4. **To release an update,** tag a new version in your repo and open a PR bumping `latest_version` and `ref` (and anything else that changed). Nandi never updates installs automatically. Users see the update and apply it themselves.
 
